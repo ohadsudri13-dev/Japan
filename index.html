@@ -1436,7 +1436,8 @@ function PriceTag({ price, onSet }) {
     "+ ₪",
   );
 }
-function PriceSummary({ items, itinOrder, extraExpenses }) {
+function PriceSummary({ items, itinOrder, extraExpenses, order, legOf }) {
+  const [open, setOpen] = useState(false);
   let total = 0;
   Object.keys(itinOrder || {}).forEach((title) => {
     const inPlanIds = new Set(itinOrder[title] || []);
@@ -1454,19 +1455,96 @@ function PriceSummary({ items, itinOrder, extraExpenses }) {
     }
   });
   if (total <= 0) return null;
+
+  const groups = [];
+  (order || []).forEach((legId) => {
+    const inPlanIds = new Set(itinOrder[legId] || []);
+    const legEntries = (items[legId] || []).filter(
+      (e) => e.kind === "item" && inPlanIds.has(e.id) && e.price,
+    );
+    if (legEntries.length > 0) {
+      const name = legOf ? legOf(legId).nameHe : legId;
+      groups.push({
+        key: `leg-${legId}`,
+        label: name,
+        entries: legEntries.map((e) => ({ id: e.id, text: e.text, price: e.price })),
+      });
+    }
+  });
+  const expEntries = (extraExpenses || []).filter((e) => e.price);
+  if (expEntries.length > 0) {
+    groups.push({
+      key: "expenses",
+      label: "הוצאות נוספות",
+      entries: expEntries.map((e) => ({ id: e.id, text: e.text, price: e.price })),
+    });
+  }
+
   return /*#__PURE__*/ React.createElement(
     "div",
-    { className: "jp-price-summary" },
+    { className: "jp-price-summary-block" },
     /*#__PURE__*/ React.createElement(
-      "span",
-      { className: "jp-price-summary-label" },
-      "סה״כ מחירים שהוספתם",
+      "button",
+      { className: "jp-price-summary", onClick: () => setOpen((o) => !o) },
+      /*#__PURE__*/ React.createElement(
+        "span",
+        { className: "jp-price-summary-label" },
+        "סה״כ מחירים שהוספתם",
+      ),
+      /*#__PURE__*/ React.createElement(
+        "span",
+        { className: "jp-price-summary-right" },
+        /*#__PURE__*/ React.createElement(
+          "span",
+          { className: "jp-price-summary-total" },
+          "₪",
+          total.toLocaleString(),
+        ),
+        /*#__PURE__*/ React.createElement(ChevronDown, {
+          size: 17,
+          className: `jp-tip-chevron ${open ? "jp-rot" : ""}`,
+        }),
+      ),
     ),
     /*#__PURE__*/ React.createElement(
-      "span",
-      { className: "jp-price-summary-total" },
-      "₪",
-      total.toLocaleString(),
+      "div",
+      { className: `jp-collapse ${open ? "jp-open" : ""}` },
+      /*#__PURE__*/ React.createElement(
+        "div",
+        { className: "jp-collapse-inner jp-price-breakdown" },
+        groups.map((g) =>
+          /*#__PURE__*/ React.createElement(
+            "div",
+            { key: g.key, className: "jp-sugg-section" },
+            /*#__PURE__*/ React.createElement(
+              "div",
+              { className: "jp-sugg-section-title" },
+              g.label,
+            ),
+            /*#__PURE__*/ React.createElement(
+              "ul",
+              { className: "jp-price-breakdown-list" },
+              g.entries.map((e) =>
+                /*#__PURE__*/ React.createElement(
+                  "li",
+                  { key: e.id, className: "jp-price-breakdown-row" },
+                  /*#__PURE__*/ React.createElement(
+                    "span",
+                    { className: "jp-price-breakdown-text" },
+                    e.text,
+                  ),
+                  /*#__PURE__*/ React.createElement(
+                    "span",
+                    { className: "jp-price-breakdown-price" },
+                    "₪",
+                    e.price,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     ),
   );
 }
@@ -2433,6 +2511,8 @@ function ItineraryTab({
       items: items,
       itinOrder: itinOrder,
       extraExpenses: extraExpenses,
+      order: order,
+      legOf: legOf,
     }),
   );
 }
@@ -3643,9 +3723,16 @@ function Splash({ onDone }) {
         .jp-price-tag { align-self: flex-start; font-size: 13px; font-weight: 700; color: ${GREEN}; }
         .jp-price-add { align-self: flex-start; font-size: 11.5px; color: ${MUTED}; opacity: 0.5; }
         .jp-price-input { width: 80px; background: ${CARD_ALT}; border: 1px solid ${GREEN}; border-radius: 7px; color: ${GREEN}; font-weight: 700; padding: 4px 8px; font-size: 16px; font-family: 'Heebo', sans-serif; }
-        .jp-price-summary { display: flex; align-items: center; justify-content: space-between; background: ${CARD}; border: 1px solid rgba(91,148,99,0.35); border-radius: 16px; padding: 16px 18px; margin-top: 10px; }
+        .jp-price-summary-block { margin-top: 10px; }
+        .jp-price-summary { display: flex; align-items: center; justify-content: space-between; width: 100%; background: ${CARD}; border: 1px solid rgba(91,148,99,0.35); border-radius: 16px; padding: 16px 18px; cursor: pointer; font-family: 'Heebo', sans-serif; }
         .jp-price-summary-label { font-size: 13.5px; color: ${MUTED}; font-weight: 600; }
+        .jp-price-summary-right { display: flex; align-items: center; gap: 8px; }
         .jp-price-summary-total { font-family: 'Frank Ruhl Libre', serif; font-size: 22px; font-weight: 800; color: ${GREEN}; }
+        .jp-price-breakdown { padding-top: 14px; }
+        .jp-price-breakdown-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+        .jp-price-breakdown-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px; }
+        .jp-price-breakdown-text { font-size: 14.5px; color: ${TEXT}; }
+        .jp-price-breakdown-price { font-size: 14.5px; font-weight: 700; color: ${GREEN}; flex-shrink: 0; }
         .jp-outline-controls { display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
         .jp-add-row-pair { display: flex; gap: 18px; margin-top: 6px; }
         .jp-flight-card { padding-bottom: 14px; }
